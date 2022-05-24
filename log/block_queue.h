@@ -17,14 +17,14 @@ template <class T>
 class block_queue
 {
 public:
-    block_queue(int max_size = 1000)
+    block_queue(int max_size = 1000)    //初始化私有成员
     {
         if (max_size <= 0)
         {
             exit(-1);
         }
 
-        m_max_size = max_size;
+        m_max_size = max_size;  //构造函数创建循环数组
         m_array = new T[max_size];
         m_size = 0;
         m_front = -1;
@@ -121,22 +121,22 @@ public:
         m_mutex.unlock();
         return tmp;
     }
-    //往队列添加元素，需要将所有使用队列的线程先唤醒
-    //当有元素push进队列,相当于生产者生产了一个元素
-    //若当前没有线程等待条件变量,则唤醒无意义
-    bool push(const T &item)
+
+    bool push(const T &item)    //往队列添加元素，需要将所有使用队列的线程先唤醒
+        //当有元素push进队列,相当于生产者生产了一个元素
+        //若当前没有线程等待条件变量,则唤醒无意义
     {
 
         m_mutex.lock();
         if (m_size >= m_max_size)
         {
 
-            m_cond.broadcast();
+            m_cond.broadcast(); //pthread_cond_broadcast函数，以广播的方式唤醒所有等待目标条件变量的线程
             m_mutex.unlock();
             return false;
         }
 
-        m_back = (m_back + 1) % m_max_size;
+        m_back = (m_back + 1) % m_max_size; ////将新增数据放在循环数组的对应位置
         m_array[m_back] = item;
 
         m_size++;
@@ -145,29 +145,32 @@ public:
         m_mutex.unlock();
         return true;
     }
-    //pop时,如果当前队列没有元素,将会等待条件变量
-    bool pop(T &item)
+    
+    bool pop(T &item)   //pop时,如果当前队列没有元素,将会等待条件变量
     {
 
         m_mutex.lock();
-        while (m_size <= 0)
+        while (m_size <= 0) //资源不可用，等待
+        //多个消费者的时候，这里要是用while而不是if(防止资源已经被别的线程取走)
         {
             
-            if (!m_cond.wait(m_mutex.get()))
+            if (!m_cond.wait(m_mutex.get()))    //当重新抢到互斥锁，pthread_cond_wait返回为0
             {
                 m_mutex.unlock();
                 return false;
             }
         }
 
-        m_front = (m_front + 1) % m_max_size;
+        m_front = (m_front + 1) % m_max_size;   //取出队列首的元素，这里需要理解一下，使用循环数组模拟的队列
         item = m_array[m_front];
         m_size--;
         m_mutex.unlock();
         return true;
     }
 
-    //增加了超时处理
+    //增加了超时处理，在项目中没有使用到
+    //在pthread_cond_wait基础上增加了等待的时间，只指定时间内能抢到互斥锁即可
+    //其他逻辑不变
     bool pop(T &item, int ms_timeout)
     {
         struct timespec t = {0, 0};
@@ -199,14 +202,14 @@ public:
     }
 
 private:
-    locker m_mutex;
-    cond m_cond;
+    locker m_mutex;     //锁对象
+    cond m_cond;        //信号量对象
 
-    T *m_array;
-    int m_size;
-    int m_max_size;
-    int m_front;
-    int m_back;
+    T *m_array;     //队列指针
+    int m_size;     // 当前size
+    int m_max_size;     //  最大size
+    int m_front;    //队首
+    int m_back;     //队尾
 };
 
 #endif

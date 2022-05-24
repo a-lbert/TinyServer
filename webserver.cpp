@@ -76,10 +76,13 @@ void WebServer::log_write()
 {
     if (0 == m_close_log)
     {
-        //初始化日志
-        if (1 == m_log_write)
+        //初始化日志；单例模式，懒汉模式获取实例
+        if (1 == m_log_write)   //异步模式判断是否分文件
+            //格式化输出内容，将内容写入阻塞队列，创建一个写线程，从阻塞队列取出内容写入日志文件
             Log::get_instance()->init("./ServerLog", m_close_log, 2000, 800000, 800);
-        else
+        else    //同步模式
+        //判断是否分文件
+        //直接格式化输出内容，将信息写入日志文件
             Log::get_instance()->init("./ServerLog", m_close_log, 2000, 800000, 0);
     }
 }
@@ -148,7 +151,7 @@ void WebServer::eventListen()
     setsockopt(m_listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
     ret = bind(m_listenfd, (struct sockaddr *)&address, sizeof(address));
     assert(ret >= 0);
-    ret = listen(m_listenfd, 5);
+    ret = listen(m_listenfd, 5);    //让一个套接字处于监听到来的连接请求的状态
     assert(ret >= 0);
 
     utils.init(TIMESLOT);
@@ -455,8 +458,7 @@ void WebServer::eventLoop()
 
         for (int i = 0; i < number; i++)    //轮询文件描述符
         {
-            int sockfd = events[i].data.fd;
-
+             
             
             if (sockfd == m_listenfd)   //处理新到的客户连接
             {
@@ -471,7 +473,7 @@ void WebServer::eventLoop()
                 util_timer *timer = users_timer[sockfd].timer;
                 deal_timer(timer, sockfd);
             }
-            //处理信号、管道读端对应文件描述符发生读事件（处理定时器信号）
+            //处理信号管道读端对应文件描述符发生读事件（处理定时器信号）
             else if ((sockfd == m_pipefd[0]) && (events[i].events & EPOLLIN))
             {
                 bool flag = dealwithsignal(timeout, stop_server);
