@@ -24,21 +24,41 @@ void http_conn::initmysql_result(connection_pool *connPool)
     connectionRAII mysqlcon(&mysql, connPool);
 
     //在user表中检索username，passwd数据，浏览器端输入
+
+    // int mysql_query(MYSQL *mysql, const char *query)
+    // 参数介绍:
+    //     mysql 连接句柄
+    //     query 执行的sql
+    // 返回值：
+    //     成功 返回 0
+    //     失败 返回 非0
     if (mysql_query(mysql, "SELECT username,passwd FROM user"))
     {
         LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
     }
 
     //从表中检索完整的结果集
+    // MYSQL_RES *mysql_store_result(MYSQL *mysql)
+    // 返回值： 
+    //   如果读取结果集失败，mysql_store_result()还会返回Null指针。
+    //   通过检查mysql_error()是否返回非空字符串，mysql_errno()是否返回非0值，或mysql_field_count()是否返回0，可以检查是否出现了错误。
+
     MYSQL_RES *result = mysql_store_result(mysql);
 
-    //返回结果集中的列数
+    
+    // unsigned int mysql_num_fields(MYSQL_RES *result)
+    // 描述：返回结果集中的列数。
     int num_fields = mysql_num_fields(result);
 
     //返回所有字段结构的数组
+    //MYSQL_FIELD *mysql_fetch_field(MYSQL_RES *result)
+    //返回采用MYSQL_FIELD结构的结果集的列。重复调用该函数，以检索关于结果集中所有列的信息。
+    //未剩余字段时，mysql_fetch_field()返回NULL。
     MYSQL_FIELD *fields = mysql_fetch_fields(result);
 
     //从结果集中获取下一行，将对应的用户名和密码，存入map中
+    //MYSQL_ROW mysql_fetch_row(MYSQL_RES *result)
+    //检索结果集的下一行
     while (MYSQL_ROW row = mysql_fetch_row(result))
     {
         string temp1(row[0]);
@@ -460,19 +480,20 @@ http_conn::HTTP_CODE http_conn::do_request()
         free(m_url_real);
 
         //将用户名和密码提取出来
-        //user=123&passwd=123 ？ 是password吧？
+        //user=123&password=123
         char name[100], password[100];
         int i;
+        //以&为分隔符，前面的为用户名
         for (i = 5; m_string[i] != '&'; ++i)
             name[i - 5] = m_string[i];
         name[i - 5] = '\0';
-
+        //以&为分隔符，后面的是密码
         int j = 0;
         for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
             password[j] = m_string[i];
         password[j] = '\0';
-        //注册
-        if (*(p + 1) == '3')
+        
+        if (*(p + 1) == '3')    //注册
         {
             //如果是注册，先检测数据库中是否有重名的
             //没有重名的，进行增加数据
@@ -484,17 +505,17 @@ http_conn::HTTP_CODE http_conn::do_request()
             strcat(sql_insert, password);
             strcat(sql_insert, "')");
             //map<string, string> users; 存储用户名、密码；用于用户查重；避免频繁访问数据库；
-            if (users.find(name) == users.end())
+            if (users.find(name) == users.end())    //判断map中能否找到重复的用户名 
             {
-                m_lock.lock();
+                m_lock.lock();  //向数据库中插入数据时，需要通过锁来同步数据
                 //数据库查询语句；成功返回True；
                 int res = mysql_query(mysql, sql_insert);
                 users.insert(pair<string, string>(name, password));
                 m_lock.unlock();
 
-                if (!res)
+                if (!res)   //校验成功，跳转登录页面
                     strcpy(m_url, "/log.html");
-                else    //用户已存在
+                else    //校验失败，跳转注册失败页面
                     strcpy(m_url, "/registerError.html");
             }
             else    //用户已经存在

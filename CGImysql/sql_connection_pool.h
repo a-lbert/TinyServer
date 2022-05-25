@@ -22,7 +22,7 @@ public:
 	void DestroyPool();					 //销毁所有连接
 
 	//单例模式
-	static connection_pool *GetInstance();
+	static connection_pool *GetInstance();	//局部静态变量懒汉模式创建连接池
 
 	void init(string url, string User, string PassWord, string DataBaseName, int Port, int MaxConn, int close_log); 
 
@@ -46,10 +46,10 @@ public:
 	int m_close_log;	//日志开关
 };
 
-class connectionRAII{
+class connectionRAII{	//将数据库连接的获取与释放通过RAII机制封装，避免手动释放
 
 public:
-	connectionRAII(MYSQL **con, connection_pool *connPool);
+	connectionRAII(MYSQL **con, connection_pool *connPool);	//双指针对MYSQL *con修改
 	~connectionRAII();
 	
 private:
